@@ -1,11 +1,37 @@
 # Epic Video Player
 
-A TikTok-style video player built with React and Material UI. Features include:
-- Vertical scrollable video feed
-- Auto-play on scroll
-- Video information overlay
-- Social interaction buttons
-- Mobile-optimized design
+A modern video player built with React and Material UI.
+
+## Live Demo
+
+Visit the live demo at: [https://mtromby.github.io/epic-video-player/](https://mtromby.github.io/epic-video-player/)
+
+## Features
+
+- Modern UI with Material Design
+- Responsive layout
+- Mobile-optimized experience
+- High performance video playback
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Technologies Used
+
+- React
+- Material UI
+- Vite
+- GitHub Pages for hosting
 
 ## Tech Stack
 - React
