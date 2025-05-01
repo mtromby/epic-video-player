@@ -15,17 +15,45 @@ import CommentIcon from '@mui/icons-material/Comment';
  * - Mobile-optimized design
  */
 const Home = () => {
-  // State management
+  console.log('=== HOME COMPONENT STARTING ===');
+  
   const { supabase } = useSupabase();
+  console.log('Supabase client:', supabase ? 'exists' : 'missing');
+  
   const [videos, setVideos] = useState([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [containerHeight, setContainerHeight] = useState('100vh');
   
-  // Refs for video control
   const videoRef = useRef(null);
   const containerRef = useRef(null);
+
+  // Test Supabase connection
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        console.log('Testing Supabase connection...');
+        const { data, error } = await supabase
+          .from('VIDEOS')
+          .select('count')
+          .limit(1);
+        
+        if (error) {
+          console.error('Supabase connection test failed:', error);
+        } else {
+          console.log('Supabase connection test successful:', data);
+        }
+      } catch (err) {
+        console.error('Error testing Supabase connection:', err);
+      }
+    };
+
+    testConnection();
+  }, [supabase]);
+
+  // Debug log for initial render
+  console.log('Home component rendered');
 
   // Calculate the proper height for the video container
   useEffect(() => {
@@ -33,6 +61,7 @@ const Home = () => {
       const viewportHeight = window.innerHeight;
       const bottomNavHeight = 56; // Height of the bottom navigation bar
       const availableHeight = viewportHeight - bottomNavHeight;
+      console.log('Container height calculated:', availableHeight);
       setContainerHeight(`${availableHeight}px`);
     };
 
@@ -47,6 +76,7 @@ const Home = () => {
    */
   const fetchVideos = async () => {
     try {
+      console.log('Fetching videos from Supabase...');
       setLoading(true);
       setError(null);
       
@@ -56,8 +86,16 @@ const Home = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching videos:', error);
+        console.error('Supabase error:', error);
         setError('Failed to fetch videos');
+        return;
+      }
+
+      console.log('Videos fetched:', data);
+      
+      if (!data || data.length === 0) {
+        console.log('No videos found in database');
+        setError('No videos found');
         return;
       }
 
@@ -72,8 +110,18 @@ const Home = () => {
 
   // Fetch videos on component mount
   useEffect(() => {
+    console.log('Home component mounted, fetching videos...');
     fetchVideos();
   }, [supabase]);
+
+  // Debug log for videos state
+  useEffect(() => {
+    console.log('Videos state updated:', videos);
+    console.log('Current video index:', currentVideoIndex);
+    if (videos[currentVideoIndex]) {
+      console.log('Current video:', videos[currentVideoIndex]);
+    }
+  }, [videos, currentVideoIndex]);
 
   // Handle video playback when current video changes
   useEffect(() => {
@@ -145,7 +193,7 @@ const Home = () => {
    */
   const handleVideoError = (e) => {
     const video = e.target;
-    console.error('Video error:', {
+    console.error('Video error details:', {
       src: video.src,
       error: video.error,
       readyState: video.readyState,
@@ -167,18 +215,21 @@ const Home = () => {
     const newIndex = Math.round(scrollTop / clientHeight);
     
     if (newIndex !== currentVideoIndex) {
+      console.log('Scrolling to video index:', newIndex);
       setCurrentVideoIndex(newIndex);
     }
   };
 
   // Loading state
   if (loading) {
+    console.log('Rendering loading state');
     return (
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center', 
-        height: containerHeight 
+        height: containerHeight,
+        backgroundColor: 'black'
       }}>
         <CircularProgress />
       </Box>
@@ -187,6 +238,7 @@ const Home = () => {
 
   // Error state
   if (error) {
+    console.log('Rendering error state:', error);
     return (
       <Box sx={{ 
         display: 'flex', 
@@ -194,7 +246,8 @@ const Home = () => {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: containerHeight,
-        gap: 2
+        gap: 2,
+        backgroundColor: 'black'
       }}>
         <Typography color="error">{error}</Typography>
       </Box>
@@ -203,17 +256,23 @@ const Home = () => {
 
   // Empty state
   if (!videos.length) {
+    console.log('Rendering empty state');
     return (
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center', 
-        height: containerHeight 
+        height: containerHeight,
+        backgroundColor: 'black'
       }}>
         <Typography>No videos found</Typography>
       </Box>
     );
   }
+
+  console.log('Rendering video feed with', videos.length, 'videos');
+  console.log('Current video index:', currentVideoIndex);
+  console.log('Container height:', containerHeight);
 
   const currentVideo = videos[currentVideoIndex];
 
@@ -231,28 +290,21 @@ const Home = () => {
         },
         msOverflowStyle: 'none',
         scrollbarWidth: 'none',
+        backgroundColor: 'black',
       }}
       onScroll={handleScroll}
     >
-      {videos.map((video, index) => (
-        <Box
-          key={index}
-          sx={{
-            height: containerHeight,
-            width: '100%',
-            position: 'relative',
-            scrollSnapAlign: 'start',
-            backgroundColor: 'black',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          {/* Video Player */}
+      {videos.map((video, index) => {
+        console.log(`Rendering video ${index}:`, video);
+        return (
           <Box
+            key={video.id}
             sx={{
+              height: containerHeight,
               width: '100%',
-              height: '100%',
+              position: 'relative',
+              scrollSnapAlign: 'start',
+              backgroundColor: 'black',
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
@@ -261,9 +313,9 @@ const Home = () => {
             <video
               ref={index === currentVideoIndex ? videoRef : null}
               style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
               }}
               controls={false}
               autoPlay={index === currentVideoIndex}
@@ -272,74 +324,75 @@ const Home = () => {
               playsInline
               crossOrigin="anonymous"
               onError={handleVideoError}
+              src={video.video_link}
             />
-          </Box>
-          
-          {/* Video Information Overlay */}
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              p: 2,
-              background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-              zIndex: 1,
-            }}
-          >
-            <Typography variant="h6" color="white" gutterBottom>
-              {video.title}
-            </Typography>
             
-            {/* Performers */}
-            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-              {video.performers?.map((performer, index) => (
-                <Chip
-                  key={index}
-                  label={performer}
-                  size="small"
-                  sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
-                />
-              ))}
+            {/* Video Information Overlay */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                p: 2,
+                background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                zIndex: 1,
+              }}
+            >
+              <Typography variant="h6" color="white" gutterBottom>
+                {video.title}
+              </Typography>
+              
+              {/* Performers */}
+              <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                {video.performers?.map((performer, index) => (
+                  <Chip
+                    key={index}
+                    label={performer}
+                    size="small"
+                    sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                  />
+                ))}
+              </Box>
+              
+              {/* Tags */}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {video.tags?.map((tag, index) => (
+                  <Chip
+                    key={index}
+                    label={`#${tag}`}
+                    size="small"
+                    sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                  />
+                ))}
+              </Box>
             </Box>
-            
-            {/* Tags */}
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              {video.tags?.map((tag, index) => (
-                <Chip
-                  key={index}
-                  label={`#${tag}`}
-                  size="small"
-                  sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
-                />
-              ))}
-            </Box>
-          </Box>
 
-          {/* Social Interaction Buttons */}
-          <Box
-            sx={{
-              position: 'absolute',
-              right: 16,
-              bottom: 100,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              zIndex: 1,
-            }}
-          >
-            <IconButton sx={{ color: 'white' }}>
-              <FavoriteIcon />
-            </IconButton>
-            <IconButton sx={{ color: 'white' }}>
-              <CommentIcon />
-            </IconButton>
-            <IconButton sx={{ color: 'white' }}>
-              <ShareIcon />
-            </IconButton>
+            {/* Social Interaction Buttons */}
+            <Box
+              sx={{
+                position: 'absolute',
+                right: 16,
+                bottom: 100,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                zIndex: 1,
+              }}
+            >
+              <IconButton sx={{ color: 'white' }}>
+                <FavoriteIcon />
+              </IconButton>
+              <IconButton sx={{ color: 'white' }}>
+                <CommentIcon />
+              </IconButton>
+              <IconButton sx={{ color: 'white' }}>
+                <ShareIcon />
+              </IconButton>
+            </Box>
           </Box>
-        </Box>
-      ))}
+        );
+      })}
     </Box>
   );
 };

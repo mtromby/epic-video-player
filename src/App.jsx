@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
@@ -16,24 +16,33 @@ import { SupabaseProvider } from './context/SupabaseContext';
 
 function App() {
   const [value, setValue] = useState(0);
+  
+  // Get the base path from the environment or default to ''
+  const basePath = import.meta.env.BASE_URL || '/epic-video-player';
 
   return (
     <SupabaseProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Router>
+        <Router basename={basePath}>
           <div style={{ 
             display: 'flex', 
             flexDirection: 'column', 
-            minHeight: '100vh',
-            paddingBottom: '56px' // Space for bottom navigation
+            height: '100vh',
+            overflow: 'hidden'
           }}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/explore" element={<Explore />} />
-              <Route path="/performers" element={<Performers />} />
-              <Route path="/manage" element={<Manage />} />
-            </Routes>
+            <div style={{ 
+              flex: 1,
+              overflow: 'hidden',
+              position: 'relative'
+            }}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/explore" element={<Explore />} />
+                <Route path="/performers" element={<Performers />} />
+                <Route path="/manage" element={<Manage />} />
+              </Routes>
+            </div>
             
             <Paper 
               sx={{ 
@@ -50,7 +59,9 @@ function App() {
                 onChange={(event, newValue) => {
                   setValue(newValue);
                   const paths = ['/', '/explore', '/performers', '/manage'];
-                  window.location.href = paths[newValue];
+                  // Use window.location.pathname to preserve the base path
+                  const newPath = `${basePath}${paths[newValue]}`;
+                  window.location.href = newPath;
                 }}
                 showLabels
               >

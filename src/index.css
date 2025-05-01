@@ -4,6 +4,12 @@
   box-sizing: border-box;
 }
 
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -11,14 +17,13 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
   background-color: #121212;
   color: #ffffff;
 }
 
 #root {
-  min-height: 100vh;
-  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Mobile optimization */
@@ -33,20 +38,12 @@ body {
   user-select: none;
 }
 
-/* Custom scrollbar for webkit browsers */
+/* Hide scrollbars but keep functionality */
 ::-webkit-scrollbar {
-  width: 8px;
+  display: none;
 }
 
-::-webkit-scrollbar-track {
-  background: #1E1E1E;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #FFD700;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #FFC000;
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
