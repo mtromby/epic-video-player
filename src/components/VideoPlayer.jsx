@@ -1,13 +1,13 @@
-import { forwardRef, useEffect, useState } from 'react';
-import { Box, CircularProgress } from '@mui/material';
-
 /**
- * VideoPlayer component that handles video playback
+ * VideoPlayer component that handles video playback with loading states and error handling
  * @param {Object} props
  * @param {string} props.videoUrl - The URL of the video to play
  * @param {boolean} props.isActive - Whether this video is currently active
  * @param {Function} props.onError - Callback for video errors
  */
+import { forwardRef, useEffect, useState } from 'react';
+import { Box, CircularProgress } from '@mui/material';
+
 const VideoPlayer = forwardRef(({ videoUrl, isActive, onError }, ref) => {
   const [isLoading, setIsLoading] = useState(true);
 
@@ -25,7 +25,6 @@ const VideoPlayer = forwardRef(({ videoUrl, isActive, onError }, ref) => {
       if (isActive) {
         video.load();
         video.play().catch(err => {
-          console.error('Error playing video:', err);
           onError?.(err);
         });
       } else {
@@ -56,6 +55,7 @@ const VideoPlayer = forwardRef(({ videoUrl, isActive, onError }, ref) => {
         position: 'relative',
       }}
     >
+      {/* Loading indicator */}
       {isLoading && (
         <Box
           sx={{
@@ -69,6 +69,8 @@ const VideoPlayer = forwardRef(({ videoUrl, isActive, onError }, ref) => {
           <CircularProgress />
         </Box>
       )}
+      
+      {/* Video element */}
       <video
         ref={ref}
         style={{

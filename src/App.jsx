@@ -1,3 +1,7 @@
+/**
+ * Main application component that sets up routing and navigation
+ * Uses Material-UI for styling and React Router for navigation
+ */
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
@@ -15,6 +19,7 @@ import Manage from './components/Manage';
 import { SupabaseProvider } from './context/SupabaseContext';
 
 function App() {
+  // State to track the active navigation item
   const [value, setValue] = useState(0);
   
   // Get the base path from the environment or default to ''
@@ -31,6 +36,7 @@ function App() {
             height: '100vh',
             overflow: 'hidden'
           }}>
+            {/* Main content area */}
             <div style={{ 
               flex: 1,
               overflow: 'hidden',
@@ -44,6 +50,7 @@ function App() {
               </Routes>
             </div>
             
+            {/* Bottom navigation bar */}
             <Paper 
               sx={{ 
                 position: 'fixed', 
@@ -59,7 +66,6 @@ function App() {
                 onChange={(event, newValue) => {
                   setValue(newValue);
                   const paths = ['/', '/explore', '/performers', '/manage'];
-                  // Use window.location.pathname to preserve the base path
                   const newPath = `${basePath}${paths[newValue]}`;
                   window.location.href = newPath;
                 }}

@@ -1,10 +1,3 @@
-import { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Chip, IconButton, CircularProgress } from '@mui/material';
-import { useSupabase } from '../context/SupabaseContext';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import ShareIcon from '@mui/icons-material/Share';
-import CommentIcon from '@mui/icons-material/Comment';
-
 /**
  * TikTok-style video feed component that displays videos in a vertical scrollable interface.
  * Features:
@@ -14,46 +7,28 @@ import CommentIcon from '@mui/icons-material/Comment';
  * - Social interaction buttons
  * - Mobile-optimized design
  */
+import { useState, useEffect, useRef } from 'react';
+import { Box, Typography, Chip, IconButton, CircularProgress, Button, Paper } from '@mui/material';
+import { useSupabase } from '../context/SupabaseContext';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import ShareIcon from '@mui/icons-material/Share';
+import CommentIcon from '@mui/icons-material/Comment';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+
 const Home = () => {
-  console.log('=== HOME COMPONENT STARTING ===');
-  
   const { supabase } = useSupabase();
-  console.log('Supabase client:', supabase ? 'exists' : 'missing');
-  
   const [videos, setVideos] = useState([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [containerHeight, setContainerHeight] = useState('100vh');
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
   
   const videoRef = useRef(null);
   const containerRef = useRef(null);
-
-  // Test Supabase connection
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        console.log('Testing Supabase connection...');
-        const { data, error } = await supabase
-          .from('VIDEOS')
-          .select('count')
-          .limit(1);
-        
-        if (error) {
-          console.error('Supabase connection test failed:', error);
-        } else {
-          console.log('Supabase connection test successful:', data);
-        }
-      } catch (err) {
-        console.error('Error testing Supabase connection:', err);
-      }
-    };
-
-    testConnection();
-  }, [supabase]);
-
-  // Debug log for initial render
-  console.log('Home component rendered');
+  const previewRef = useRef(null);
 
   // Calculate the proper height for the video container
   useEffect(() => {
@@ -61,7 +36,6 @@ const Home = () => {
       const viewportHeight = window.innerHeight;
       const bottomNavHeight = 56; // Height of the bottom navigation bar
       const availableHeight = viewportHeight - bottomNavHeight;
-      console.log('Container height calculated:', availableHeight);
       setContainerHeight(`${availableHeight}px`);
     };
 
@@ -76,7 +50,6 @@ const Home = () => {
    */
   const fetchVideos = async () => {
     try {
-      console.log('Fetching videos from Supabase...');
       setLoading(true);
       setError(null);
       
@@ -86,22 +59,17 @@ const Home = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase error:', error);
         setError('Failed to fetch videos');
         return;
       }
-
-      console.log('Videos fetched:', data);
       
       if (!data || data.length === 0) {
-        console.log('No videos found in database');
         setError('No videos found');
         return;
       }
 
       setVideos(data);
     } catch (err) {
-      console.error('Error in fetchVideos:', err);
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
@@ -110,18 +78,8 @@ const Home = () => {
 
   // Fetch videos on component mount
   useEffect(() => {
-    console.log('Home component mounted, fetching videos...');
     fetchVideos();
   }, [supabase]);
-
-  // Debug log for videos state
-  useEffect(() => {
-    console.log('Videos state updated:', videos);
-    console.log('Current video index:', currentVideoIndex);
-    if (videos[currentVideoIndex]) {
-      console.log('Current video:', videos[currentVideoIndex]);
-    }
-  }, [videos, currentVideoIndex]);
 
   // Handle video playback when current video changes
   useEffect(() => {
@@ -162,14 +120,12 @@ const Home = () => {
           video.load();
         });
 
-        // Only play if still mounted and this is still the current video
-        if (isMounted && currentVideo === videos[currentVideoIndex]) {
+        // Only play if still mounted, this is still the current video, and user has interacted
+        if (isMounted && currentVideo === videos[currentVideoIndex] && hasUserInteracted) {
           await video.play();
         }
       } catch (err) {
-        // Only log errors if component is still mounted
         if (isMounted) {
-          console.error('Error playing video:', err);
           setError(`Failed to play video: ${err.message}`);
         }
       }
@@ -185,7 +141,27 @@ const Home = () => {
         videoRef.current.src = '';
       }
     };
-  }, [currentVideoIndex, videos]);
+  }, [currentVideoIndex, videos, hasUserInteracted]);
+
+  // Load preview frame for the welcome overlay
+  useEffect(() => {
+    if (videos.length > 0 && previewRef.current) {
+      const video = previewRef.current;
+      video.crossOrigin = 'anonymous';
+      video.src = videos[0].video_link;
+      video.currentTime = 3; // Set to 3 seconds
+      
+      const handlePreviewLoad = () => {
+        setPreviewLoaded(true);
+        video.removeEventListener('loadeddata', handlePreviewLoad);
+      };
+      
+      video.addEventListener('loadeddata', handlePreviewLoad);
+      return () => {
+        video.removeEventListener('loadeddata', handlePreviewLoad);
+      };
+    }
+  }, [videos]);
 
   /**
    * Handles video errors
@@ -193,14 +169,6 @@ const Home = () => {
    */
   const handleVideoError = (e) => {
     const video = e.target;
-    console.error('Video error details:', {
-      src: video.src,
-      error: video.error,
-      readyState: video.readyState,
-      networkState: video.networkState,
-      errorCode: video.error?.code,
-      errorMessage: video.error?.message
-    });
     setError(`Failed to load video. Error code: ${video.error?.code || 'unknown'}`);
   };
 
@@ -210,19 +178,31 @@ const Home = () => {
    */
   const handleScroll = (e) => {
     const { scrollTop, clientHeight } = e.target;
-    
-    // Calculate which video should be shown based on scroll position
     const newIndex = Math.round(scrollTop / clientHeight);
     
     if (newIndex !== currentVideoIndex) {
-      console.log('Scrolling to video index:', newIndex);
       setCurrentVideoIndex(newIndex);
+    }
+  };
+
+  /**
+   * Handles initial user interaction to start video playback
+   */
+  const handleInitialInteraction = async () => {
+    try {
+      if (videoRef.current) {
+        // Reset video to beginning
+        videoRef.current.currentTime = 0;
+        await videoRef.current.play();
+        setHasUserInteracted(true);
+      }
+    } catch (err) {
+      setError(`Failed to start playback: ${err.message}`);
     }
   };
 
   // Loading state
   if (loading) {
-    console.log('Rendering loading state');
     return (
       <Box sx={{ 
         display: 'flex', 
@@ -238,7 +218,6 @@ const Home = () => {
 
   // Error state
   if (error) {
-    console.log('Rendering error state:', error);
     return (
       <Box sx={{ 
         display: 'flex', 
@@ -254,29 +233,6 @@ const Home = () => {
     );
   }
 
-  // Empty state
-  if (!videos.length) {
-    console.log('Rendering empty state');
-    return (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: containerHeight,
-        backgroundColor: 'black'
-      }}>
-        <Typography>No videos found</Typography>
-      </Box>
-    );
-  }
-
-  console.log('Rendering video feed with', videos.length, 'videos');
-  console.log('Current video index:', currentVideoIndex);
-  console.log('Container height:', containerHeight);
-
-  const currentVideo = videos[currentVideoIndex];
-
-  // Main video feed
   return (
     <Box
       ref={containerRef}
@@ -284,115 +240,187 @@ const Home = () => {
         height: containerHeight,
         overflowY: 'scroll',
         scrollSnapType: 'y mandatory',
-        scrollBehavior: 'smooth',
+        backgroundColor: 'black',
         '&::-webkit-scrollbar': {
-          display: 'none',
+          display: 'none'
         },
         msOverflowStyle: 'none',
-        scrollbarWidth: 'none',
-        backgroundColor: 'black',
+        scrollbarWidth: 'none'
       }}
       onScroll={handleScroll}
     >
-      {videos.map((video, index) => {
-        console.log(`Rendering video ${index}:`, video);
-        return (
-          <Box
-            key={video.id}
-            sx={{
-              height: containerHeight,
+      {videos.map((video, index) => (
+        <Box
+          key={video.id}
+          sx={{
+            height: containerHeight,
+            scrollSnapAlign: 'start',
+            position: 'relative'
+          }}
+        >
+          <video
+            ref={index === currentVideoIndex ? videoRef : null}
+            style={{
               width: '100%',
-              position: 'relative',
-              scrollSnapAlign: 'start',
-              backgroundColor: 'black',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
+              height: '100%',
+              objectFit: 'cover'
             }}
-          >
-            <video
-              ref={index === currentVideoIndex ? videoRef : null}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-              controls={false}
-              autoPlay={index === currentVideoIndex}
-              loop
-              muted
-              playsInline
-              crossOrigin="anonymous"
-              onError={handleVideoError}
-              src={video.video_link}
-            />
-            
-            {/* Video Information Overlay */}
+            playsInline
+            muted={index !== currentVideoIndex}
+            onError={handleVideoError}
+          />
+          
+          {/* Initial welcome overlay */}
+          {index === currentVideoIndex && !hasUserInteracted && (
             <Box
               sx={{
                 position: 'absolute',
-                bottom: 0,
+                top: 0,
                 left: 0,
                 right: 0,
-                p: 2,
-                background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-                zIndex: 1,
+                bottom: 0,
+                zIndex: 2
               }}
             >
-              <Typography variant="h6" color="white" gutterBottom>
-                {video.title}
-              </Typography>
-              
-              {/* Performers */}
-              <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                {video.performers?.map((performer, index) => (
-                  <Chip
-                    key={index}
-                    label={performer}
-                    size="small"
-                    sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
-                  />
-                ))}
+              {/* Blurred preview */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  filter: 'blur(8px) brightness(0.8)',
+                  transform: 'scale(1.05)',
+                  opacity: previewLoaded ? 1 : 0,
+                  transition: 'opacity 0.5s ease-in-out',
+                  overflow: 'hidden'
+                }}
+              >
+                <video
+                  ref={previewRef}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transform: 'scale(1.1)'
+                  }}
+                  muted
+                  playsInline
+                />
               </Box>
-              
-              {/* Tags */}
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {video.tags?.map((tag, index) => (
-                  <Chip
-                    key={index}
-                    label={`#${tag}`}
-                    size="small"
-                    sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+
+              {/* Welcome content */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: 2,
+                  background: 'linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.4))'
+                }}
+              >
+                <Paper
+                  elevation={3}
+                  sx={{
+                    p: 2,
+                    maxWidth: '80%',
+                    width: '280px',
+                    background: 'rgba(18, 18, 18, 0.6)',
+                    backdropFilter: 'blur(8px)',
+                    borderRadius: 2,
+                    textAlign: 'center',
+                    border: '1px solid rgba(255, 215, 0, 0.2)'
+                  }}
+                >
+                  <AutoAwesomeIcon 
+                    sx={{ 
+                      fontSize: 28, 
+                      color: 'primary.main',
+                      mb: 1
+                    }} 
                   />
-                ))}
+                  <Typography 
+                    variant="h6" 
+                    component="h1" 
+                    gutterBottom
+                    sx={{ 
+                      fontWeight: 'bold',
+                      color: 'primary.main',
+                      mb: 0.5
+                    }}
+                  >
+                    Welcome to Epic Video Player
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      mb: 2,
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    Discover amazing content and immerse yourself in a world of entertainment
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={handleInitialInteraction}
+                    sx={{
+                      py: 0.75,
+                      px: 2,
+                      borderRadius: 1.5,
+                      backgroundColor: 'primary.main',
+                      color: 'primary.contrastText',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                      }
+                    }}
+                  >
+                    Start Your Journey
+                  </Button>
+                </Paper>
               </Box>
             </Box>
-
-            {/* Social Interaction Buttons */}
-            <Box
-              sx={{
-                position: 'absolute',
-                right: 16,
-                bottom: 100,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2,
-                zIndex: 1,
-              }}
-            >
-              <IconButton sx={{ color: 'white' }}>
+          )}
+          
+          {/* Video information overlay */}
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: 2,
+              background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+              color: 'white'
+            }}
+          >
+            <Typography variant="h6">{video.title}</Typography>
+            <Typography variant="body2">{video.description}</Typography>
+            
+            {/* Social interaction buttons */}
+            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+              <IconButton color="primary">
                 <FavoriteIcon />
               </IconButton>
-              <IconButton sx={{ color: 'white' }}>
-                <CommentIcon />
-              </IconButton>
-              <IconButton sx={{ color: 'white' }}>
+              <IconButton color="primary">
                 <ShareIcon />
+              </IconButton>
+              <IconButton color="primary">
+                <CommentIcon />
               </IconButton>
             </Box>
           </Box>
-        );
-      })}
+        </Box>
+      ))}
     </Box>
   );
 };
