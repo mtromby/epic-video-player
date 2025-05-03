@@ -1,33 +1,49 @@
-import { Box, Typography, Button, Paper, Container } from '@mui/material';
+import { Box, Typography, Button, Paper, Container, useTheme, useMediaQuery } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const Manage = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
-    <Container maxWidth="sm" sx={{ height: '100%', py: 3 }}>
+    <Container 
+      maxWidth="sm" 
+      sx={{ 
+        minHeight: '100vh',
+        py: isMobile ? 2 : 3,
+        px: isMobile ? 2 : 3,
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
       <Typography 
-        variant="h4" 
+        variant={isMobile ? "h5" : "h4"}
         component="h1" 
         gutterBottom 
         sx={{ 
           textAlign: 'center',
           color: 'primary.main',
           fontWeight: 'bold',
-          mb: 4
+          mb: isMobile ? 2 : 4
         }}
       >
         Video Management
       </Typography>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: isMobile ? 1.5 : 2,
+        flex: 1
+      }}>
         {/* Manage Library Button */}
         <Paper 
           elevation={3}
           sx={{ 
-            p: 2,
+            p: isMobile ? 1.5 : 2,
             borderRadius: 2,
             background: 'rgba(255, 215, 0, 0.05)',
             border: '1px solid rgba(255, 215, 0, 0.1)',
@@ -44,7 +60,8 @@ const Manage = () => {
             startIcon={<LibraryBooksIcon />}
             onClick={() => navigate('/manage/library')}
             sx={{
-              py: 2,
+              py: isMobile ? 1.5 : 2,
+              minHeight: isMobile ? '48px' : '56px',
               backgroundColor: 'primary.main',
               color: 'primary.contrastText',
               '&:hover': {
@@ -60,7 +77,7 @@ const Manage = () => {
         <Paper 
           elevation={3}
           sx={{ 
-            p: 2,
+            p: isMobile ? 1.5 : 2,
             borderRadius: 2,
             background: 'rgba(255, 215, 0, 0.05)',
             border: '1px solid rgba(255, 215, 0, 0.1)',
@@ -77,7 +94,8 @@ const Manage = () => {
             startIcon={<CloudUploadIcon />}
             onClick={() => navigate('/manage/upload')}
             sx={{
-              py: 2,
+              py: isMobile ? 1.5 : 2,
+              minHeight: isMobile ? '48px' : '56px',
               backgroundColor: 'primary.main',
               color: 'primary.contrastText',
               '&:hover': {
