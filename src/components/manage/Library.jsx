@@ -158,13 +158,15 @@ const Library = () => {
       const clipDuration = 5;
       const totalClips = 7;
       const clips = [];
+      const skipStartSeconds = 10; // Skip first 10 seconds
 
       // Adjust clip duration if video is shorter than total preview duration
-      const adjustedClipDuration = Math.min(clipDuration, duration / totalClips);
+      const adjustedClipDuration = Math.min(clipDuration, (duration - skipStartSeconds) / totalClips);
 
-      // Create evenly spaced clips
+      // Create evenly spaced clips, starting after skipStartSeconds
+      const availableDuration = duration - skipStartSeconds;
       for (let i = 0; i < totalClips; i++) {
-        const startTime = Math.floor((duration / totalClips) * i);
+        const startTime = skipStartSeconds + Math.floor((availableDuration / totalClips) * i);
         const endTime = Math.floor(startTime + adjustedClipDuration);
         clips.push({ start: startTime, end: endTime });
       }
@@ -172,10 +174,6 @@ const Library = () => {
       return clips;
     };
 
-    /**
-     * Handles mouse enter event
-     * Starts video preview when hovering
-     */
     const handleMouseEnter = () => {
       setIsHovering(true);
       if (videoRef.current) {
@@ -183,10 +181,6 @@ const Library = () => {
       }
     };
 
-    /**
-     * Handles mouse leave event
-     * Stops video preview and resets state
-     */
     const handleMouseLeave = () => {
       setIsHovering(false);
       if (videoRef.current) {
@@ -199,27 +193,36 @@ const Library = () => {
       setCurrentClipIndex(0);
     };
 
-    /**
-     * Advances to the next clip in the sequence
-     */
-    const playNextClip = () => {
-      if (!isHovering) return;
-      setCurrentClipIndex((prev) => (prev + 1) % 7);
+    const handleTouchStart = (e) => {
+      e.preventDefault();
+      setIsHovering(true);
+      if (videoRef.current) {
+        playCurrentClip();
+      }
     };
 
-    /**
-     * Plays the current clip and sets up the next clip transition
-     */
+    const handleTouchEnd = (e) => {
+      e.preventDefault();
+      setIsHovering(false);
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      setCurrentClipIndex(0);
+    };
+
     const playCurrentClip = () => {
-      if (!videoRef.current || !isHovering) return;
+      if (!videoRef.current) return;
       
       const clips = clipsRef.current;
+      if (!clips || clips.length === 0) return;
+      
       const clip = clips[currentClipIndex];
-
-      // Set video to current clip start time
       videoRef.current.currentTime = clip.start;
       
-      // Play the video
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
@@ -233,40 +236,47 @@ const Library = () => {
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => {
-        playNextClip();
-        playCurrentClip();
+        if (isHovering) {
+          const nextIndex = (currentClipIndex + 1) % clips.length;
+          setCurrentClipIndex(nextIndex);
+          playCurrentClip();
+        }
       }, clipDuration);
     };
 
-    /**
-     * Handles video loaded event
-     * Initializes preview clips and starts playback if hovering
-     */
+    const handleTimeUpdate = () => {
+      if (!videoRef.current || !isHovering) return;
+
+      const clips = clipsRef.current;
+      if (!clips || clips.length === 0) return;
+      
+      const clip = clips[currentClipIndex];
+      if (videoRef.current.currentTime >= clip.end) {
+        const nextIndex = (currentClipIndex + 1) % clips.length;
+        setCurrentClipIndex(nextIndex);
+        playCurrentClip();
+      }
+    };
+
+    // Handle clip changes
+    useEffect(() => {
+      if (isHovering) {
+        playCurrentClip();
+      }
+    }, [currentClipIndex, isHovering]);
+
     const handleVideoLoaded = () => {
       setIsVideoLoaded(true);
       if (videoRef.current) {
         const duration = videoRef.current.duration;
         setVideoDuration(duration);
         clipsRef.current = getPreviewClips(duration);
-      }
-      if (isHovering) {
-        playCurrentClip();
-      }
-    };
-
-    /**
-     * Handles video time update
-     * Ensures smooth transition between clips
-     */
-    const handleTimeUpdate = () => {
-      if (!videoRef.current || !isHovering) return;
-
-      const clips = clipsRef.current;
-      const clip = clips[currentClipIndex];
-
-      if (videoRef.current.currentTime >= clip.end) {
-        playNextClip();
-        playCurrentClip();
+        
+        // Pre-load the first clip
+        if (clipsRef.current && clipsRef.current.length > 0) {
+          const firstClip = clipsRef.current[0];
+          videoRef.current.currentTime = firstClip.start;
+        }
       }
     };
 
@@ -276,15 +286,12 @@ const Library = () => {
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = 0;
+        }
       };
     }, []);
-
-    // Handle clip changes
-    useEffect(() => {
-      if (isHovering) {
-        playCurrentClip();
-      }
-    }, [currentClipIndex, isHovering]);
 
     return (
       <Card
@@ -293,9 +300,12 @@ const Library = () => {
           display: 'flex',
           flexDirection: 'column',
           transition: 'transform 0.2s',
+          width: '100%',
           '&:active': {
             transform: 'scale(0.98)',
           },
+          borderRadius: isMobile ? 0 : 1,
+          boxShadow: isMobile ? 'none' : 1,
         }}
       >
         <Box 
@@ -304,9 +314,14 @@ const Library = () => {
             cursor: 'pointer',
             height: isMobile ? 160 : 200,
           }}
-          onClick={() => handleVideoSelect(video)}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          onMouseEnter={!isMobile ? handleMouseEnter : undefined}
+          onMouseLeave={!isMobile ? handleMouseLeave : undefined}
+          onTouchStart={isMobile ? handleTouchStart : undefined}
+          onTouchEnd={isMobile ? handleTouchEnd : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleVideoSelect(video);
+          }}
         >
           {/* Thumbnail Image */}
           <CardMedia
@@ -323,6 +338,7 @@ const Library = () => {
               height: '100%',
               opacity: isHovering ? 0 : 1,
               transition: 'opacity 0.3s ease',
+              pointerEvents: 'none'
             }}
           />
           {/* Video Preview */}
@@ -337,6 +353,7 @@ const Library = () => {
               transition: 'opacity 0.3s ease',
               bgcolor: 'black',
               overflow: 'hidden',
+              pointerEvents: 'none'
             }}
           >
             <video
@@ -348,9 +365,8 @@ const Library = () => {
                 objectFit: 'cover',
               }}
               muted
-              autoPlay
               playsInline
-              preload="auto"
+              preload="metadata"
               onLoadedData={handleVideoLoaded}
               onTimeUpdate={handleTimeUpdate}
             />
@@ -367,22 +383,38 @@ const Library = () => {
               py: 0.5,
               borderRadius: 1,
               zIndex: 2,
+              pointerEvents: 'none'
             }}
           >
             {video.duration}
           </Box>
         </Box>
         {/* Video Info */}
-        <CardContent sx={{ flexGrow: 1, p: isMobile ? 1.5 : 2 }}>
+        <CardContent sx={{ 
+          flexGrow: 1, 
+          p: isMobile ? 1 : 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5
+        }}>
           <Typography 
             variant={isMobile ? "subtitle1" : "h6"} 
             component="h2" 
             gutterBottom 
             noWrap
+            sx={{
+              fontSize: isMobile ? '0.9rem' : '1.1rem',
+              fontWeight: 500
+            }}
           >
             {video.title}
           </Typography>
-          <Box sx={{ mb: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 0.5,
+            mb: 0.5
+          }}>
             {video.tags.slice(0, isMobile ? 2 : 3).map((tag) => (
               <Chip
                 key={tag}
@@ -392,40 +424,54 @@ const Library = () => {
                   height: isMobile ? 20 : 24,
                   '& .MuiChip-label': {
                     px: isMobile ? 1 : 1.5,
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                    fontSize: isMobile ? '0.7rem' : '0.875rem',
                   }
                 }}
               />
             ))}
           </Box>
-          <Typography 
-            variant="body2" 
-            color="text.secondary" 
-            sx={{ 
-              fontSize: isMobile ? '0.75rem' : '0.875rem',
-              mb: 0.5 
-            }}
-          >
-            Uploaded: {new Date(video.uploadDate).toLocaleDateString()}
-          </Typography>
-          <Typography 
-            variant="body2" 
-            color="text.secondary"
-            sx={{ 
-              fontSize: isMobile ? '0.75rem' : '0.875rem'
-            }}
-          >
-            Views: {video.views.toLocaleString()}
-          </Typography>
+          <Box sx={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.25,
+            mt: 'auto'
+          }}>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              sx={{ 
+                fontSize: isMobile ? '0.7rem' : '0.875rem',
+              }}
+            >
+              Uploaded: {new Date(video.uploadDate).toLocaleDateString()}
+            </Typography>
+            <Typography 
+              variant="body2" 
+              color="text.secondary"
+              sx={{ 
+                fontSize: isMobile ? '0.7rem' : '0.875rem'
+              }}
+            >
+              Views: {video.views.toLocaleString()}
+            </Typography>
+          </Box>
         </CardContent>
         {/* Action Buttons */}
         <Box sx={{ 
           p: isMobile ? 0.5 : 1, 
           display: 'flex', 
-          justifyContent: 'flex-end',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           borderTop: '1px solid',
           borderColor: 'divider'
         }}>
+          <IconButton 
+            size={isMobile ? "small" : "medium"} 
+            color="primary"
+            sx={{ ml: -0.5 }}
+          >
+            <PlayArrowIcon />
+          </IconButton>
           <Box>
             <IconButton 
               size={isMobile ? "small" : "medium"} 
@@ -508,7 +554,11 @@ const Library = () => {
       maxWidth="xl" 
       sx={{ 
         py: isMobile ? 2 : 4,
-        px: isMobile ? 1 : 3
+        px: isMobile ? 0 : 3,
+        height: '100%',
+        overflow: 'auto',
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
       <Typography
@@ -519,35 +569,78 @@ const Library = () => {
           mb: isMobile ? 2 : 4,
           fontWeight: 'bold',
           color: 'primary.main',
-          px: isMobile ? 1 : 0
+          px: isMobile ? 2 : 0,
+          position: 'sticky',
+          top: 0,
+          bgcolor: 'background.paper',
+          zIndex: 1,
+          pt: 1
         }}
       >
         Video Library
       </Typography>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert 
+          severity="error" 
+          sx={{ 
+            mb: 3, 
+            mx: isMobile ? 2 : 0,
+            position: 'sticky',
+            top: isMobile ? '56px' : '64px',
+            zIndex: 1
+          }}
+        >
           {error}
         </Alert>
       )}
 
-      <Grid container spacing={isMobile ? 1 : 3}>
+      <Grid 
+        container 
+        spacing={isMobile ? 0 : 2}
+        sx={{
+          width: '100%',
+          m: 0,
+          flex: 1,
+          pb: 2 // Add padding at bottom for better scrolling
+        }}
+      >
         {videos.map((video) => (
-          <Grid key={video.id} item xs={12} sm={6} md={4} lg={3}>
+          <Grid 
+            item 
+            xs={12} 
+            sm={6} 
+            md={4} 
+            lg={3} 
+            key={video.id}
+            sx={{
+              p: isMobile ? 1 : 0,
+              width: '100%'
+            }}
+          >
             <VideoCard video={video} />
           </Grid>
         ))}
       </Grid>
 
-      {/* Loading indicator */}
-      {loading && videos.length > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
+      {hasMore && (
+        <Box 
+          ref={containerRef} 
+          sx={{ 
+            height: '40px', // Increased height for better touch target
+            mt: 2,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            position: 'sticky',
+            bottom: 0,
+            bgcolor: 'background.paper',
+            zIndex: 1
+          }}
+        >
+          {loading && <CircularProgress size={24} />}
         </Box>
       )}
-
-      {/* Intersection observer target */}
-      <div ref={containerRef} style={{ height: '20px' }} />
     </Container>
   );
 };
